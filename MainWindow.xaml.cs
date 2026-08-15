@@ -22,6 +22,8 @@ namespace Chronos
         private Geometry? geometry_BottombarDisabled;
         private Geometry? geometry_LightMode;
         private Geometry? geometry_DarkMode;
+        private Geometry? geometry_RedMode;
+        private Geometry? geometry_BlueMode;
 
         private Geometry? GetGeometry(string resourceKey)
         {
@@ -36,6 +38,8 @@ namespace Chronos
         private Geometry? GeometryBottombarDisabled => geometry_BottombarDisabled ??= GetGeometry("Bottombar_Disabled");
         private Geometry? GeometryLightMode => geometry_LightMode ??= GetGeometry("LightMode");
         private Geometry? GeometryDarkMode => geometry_DarkMode ??= GetGeometry("DarkMode");
+        private Geometry? GeometryRedMode => geometry_RedMode ??= GetGeometry("RedMode");
+        private Geometry? GeometryBlueMode => geometry_BlueMode ??= GetGeometry("BlueMode");
 
         public MainWindow() =>
             InitializeComponent();
@@ -47,7 +51,9 @@ namespace Chronos
             ToggleLineNumbers(Settings.Default.LineNumbers);
 
             ThemeManager.ThemeChanged += UpdateThemeToggleUI;
-            ThemeManager.SetTheme(Settings.Default.Theme ?? "Dark");
+
+            string savedTheme = string.IsNullOrWhiteSpace(Settings.Default.Theme) ? "Dark" : Settings.Default.Theme;
+            ThemeManager.SetTheme(savedTheme);
 
             Topmost = Settings.Default.Topmost;
             avalonEdit_TextEditor.FontFamily = new FontFamily(Settings.Default.EditorFont);
@@ -55,10 +61,25 @@ namespace Chronos
 
         private void UpdateThemeToggleUI()
         {
-            bool isDark = ThemeManager.CurrentTheme == "Dark";
+            string currentTheme = ThemeManager.CurrentTheme;
+            menuItem_ChangeTheme.Header = $"Theme ({currentTheme})";
 
-            menuItem_ChangeTheme.Tag = isDark ? GeometryLightMode : GeometryDarkMode;
-            menuItem_ChangeTheme.Header = isDark ? "Light Mode" : "Dark Mode";
+            switch (currentTheme.ToLowerInvariant())
+            {
+                case "light":
+                    menuItem_ChangeTheme.Tag = GeometryLightMode;
+                    break;
+                case "red":
+                    menuItem_ChangeTheme.Tag = GeometryRedMode;
+                    break;
+                case "blue":
+                    menuItem_ChangeTheme.Tag = GeometryBlueMode; 
+                    break;
+                case "dark":
+                default:
+                    menuItem_ChangeTheme.Tag = GeometryDarkMode;
+                    break;
+            }
         }
 
         public void SaveSettings()
@@ -136,7 +157,7 @@ namespace Chronos
             var dialog = new OpenFileDialog
             {
                 Title = "Chronos - Open File",
-                Filter = "Normal Text File (*.txt;)|*.txt|Markdown File (*.md;*.markdown)|*.md;*.markdown|All Files (*.*)|*.*"
+                Filter = "Lua Script (*.lua)|*.lua|Normal Text File (*.txt)|*.txt|Markdown File (*.md;*.markdown)|*.md;*.markdown|All Files (*.*)|*.*"
             };
 
             if (dialog.ShowDialog() == true)
@@ -158,7 +179,7 @@ namespace Chronos
             var dialog = new SaveFileDialog
             {
                 Title = "Chronos - Save File",
-                Filter = "Normal Text File (*.txt;)|*.txt|Markdown File (*.md;*.markdown)|*.md;*.markdown|All Files (*.*)|*.*"
+                Filter = "Lua Script (*.lua)|*.lua|Text File (*.txt)|*.txt|Markdown File (*.md;*.markdown)|*.md;*.markdown|All Files (*.*)|*.*"
             };
 
             if (dialog.ShowDialog() == true)
@@ -319,13 +340,31 @@ namespace Chronos
                     UpdateUndoRedoState();
                     break;
                 case "menuItem_SearchOnline":
-                    string query = avalonEdit_TextEditor.SelectedText;
-                    string url = "https://www.google.com/search?q=" + Uri.EscapeDataString(query);
-                    Process.Start(new ProcessStartInfo
+                    string query = !string.IsNullOrWhiteSpace(avalonEdit_TextEditor.SelectedText)
+                        ? avalonEdit_TextEditor.SelectedText
+                        : avalonEdit_TextEditor.Text;
+
+                    if (string.IsNullOrWhiteSpace(query))
                     {
-                        FileName = url,
-                        UseShellExecute = true
-                    });
+                        MessageBox.Show("Please select or enter text to search online.", "Chronos", MessageBoxButton.OK, MessageBoxImage.Information);
+                        break;
+                    }
+
+                    try
+                    {
+                        string encodedQuery = Uri.EscapeDataString(query.Trim());
+                        string url = $"https://www.google.com/search?q={encodedQuery}";
+
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = url,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Unable to open Web Browser: {ex.Message}", "Chronos", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                     break;
             }
         }
@@ -345,9 +384,7 @@ namespace Chronos
                     ToggleLineNumbers(!avalonEdit_TextEditor.ShowLineNumbers);
                     break;
                 case "menuItem_ChangeTheme":
-                    ThemeManager.SetTheme(
-                        ThemeManager.CurrentTheme == "Dark" ? "Light" : "Dark"
-                    );
+                    ThemeManager.SelectThemeFromFile();
                     break;
             }
         }
