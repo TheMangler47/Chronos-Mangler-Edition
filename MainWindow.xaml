@@ -57,14 +57,31 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <Path Grid.Column="0" 
-                              Data="{DynamicResource Logo}" 
-                              Fill="{DynamicResource PrimaryWindowForegroundBrush}" 
-                              Width="21" 
-                              Height="20" 
-                              VerticalAlignment="Center"
-                              HorizontalAlignment="Center"
-                              Stretch="Fill" Margin="6,0,6,0"/>
+                        <Button Grid.Column="0"
+        Click="Logo_Click"
+        Width="33"
+        Height="30"
+        Background="Transparent"
+        BorderThickness="0"
+        Padding="0"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Cursor="Hand">
+
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <ContentPresenter
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"/>
+                                </ControlTemplate>
+                            </Button.Template>
+
+                            <Path Data="{DynamicResource Logo}"
+          Fill="{DynamicResource PrimaryWindowForegroundBrush}"
+          Width="21"
+          Height="20"
+          Stretch="Fill"/>
+                        </Button>
 
                         <Grid x:Name="grid_AppMenuContainer"
                               Grid.Column="1" Margin="0,5,5,5">

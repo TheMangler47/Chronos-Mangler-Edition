@@ -24,6 +24,7 @@ namespace Chronos
         private Geometry? geometry_DarkMode;
         private Geometry? geometry_RedMode;
         private Geometry? geometry_BlueMode;
+        private Geometry? geometry_PinkMode;
 
         private Geometry? GetGeometry(string resourceKey)
         {
@@ -40,6 +41,7 @@ namespace Chronos
         private Geometry? GeometryDarkMode => geometry_DarkMode ??= GetGeometry("DarkMode");
         private Geometry? GeometryRedMode => geometry_RedMode ??= GetGeometry("RedMode");
         private Geometry? GeometryBlueMode => geometry_BlueMode ??= GetGeometry("BlueMode");
+        private Geometry? GeometryPinkMode => geometry_PinkMode ??= GetGeometry("PinkMode");
 
         public MainWindow() =>
             InitializeComponent();
@@ -74,6 +76,9 @@ namespace Chronos
                     break;
                 case "blue":
                     menuItem_ChangeTheme.Tag = GeometryBlueMode; 
+                    break;
+                case "pink":
+                    menuItem_ChangeTheme.Tag = GeometryPinkMode;
                     break;
                 case "dark":
                 default:
@@ -112,32 +117,38 @@ namespace Chronos
 
         public void ToggleSidebar(bool enabled)
         {
-            if (!enabled)
+            if (!enabled && SidebarColumn.Width.Value > 0)
             {
-                if (SidebarColumn.Width.Value > 0)
-                    _sidebarWidth = SidebarColumn.Width;
+                _sidebarWidth = SidebarColumn.Width;
             }
 
-            border_Sidebar.Visibility = enabled
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (enabled && (_sidebarWidth.Value <= 0 || double.IsNaN(_sidebarWidth.Value)))
+            {
+                _sidebarWidth = new GridLength(220); 
+            }
 
+            border_Sidebar.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
             SidebarColumn.MinWidth = enabled ? 194 : 0;
             SidebarColumn.Width = enabled ? _sidebarWidth : new GridLength(0);
+
             SplitterColumn.Width = enabled ? new GridLength(5) : new GridLength(0);
 
-            menuItem_ToggleSidebar.IsChecked = enabled;
+            if (menuItem_ToggleSidebar != null)
+                menuItem_ToggleSidebar.IsChecked = enabled;
 
-            path_Sidebar.Data = enabled
-                ? GeometrySidebarEnabled
-                : GeometrySidebarDisabled;
+            if (path_Sidebar != null)
+                path_Sidebar.Data = enabled ? GeometrySidebarEnabled : GeometrySidebarDisabled;
         }
 
         public void ToggleBottombar(bool enabled)
         {
             border_Bottombar.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
-            path_Bottombar.Data = enabled ? GeometryBottombarEnabled : GeometryBottombarDisabled;
-            menuItem_ToggleBottombar.IsChecked = enabled;
+
+            if (path_Bottombar != null)
+                path_Bottombar.Data = enabled ? GeometryBottombarEnabled : GeometryBottombarDisabled;
+
+            if (menuItem_ToggleBottombar != null)
+                menuItem_ToggleBottombar.IsChecked = enabled;
         }
 
         public void ToggleLineNumbers(bool enabled)
@@ -207,6 +218,13 @@ namespace Chronos
             menuItem_Redo.IsEnabled = canRedo;
         }
 
+        private void Logo_Click(object sender, RoutedEventArgs e)
+        {
+            Credits creditsWindow = new Credits();
+            //creditsWindow.Owner = this; 
+            creditsWindow.ShowDialog(); 
+        }
+
         public async void CloseWindow()
         {
             SaveSettings();
@@ -246,8 +264,9 @@ namespace Chronos
                     ToggleBottombar(border_Bottombar.Visibility != Visibility.Visible);
                     break;
                 case "button_Settings":
-                    if (MessageBox.Show("Toggle Topmost?", "Chronos", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                        Topmost = !Topmost;
+                    SettingsWindow settingsWindow = new SettingsWindow();
+                    settingsWindow.Owner = this; // Sets the main window as the owner
+                    settingsWindow.ShowDialog(); // Opens as a modal window (or use settingsWindow.Show() for non-modal)
                     break;
             }
         }
@@ -391,24 +410,24 @@ namespace Chronos
 
         public async Task StartSplashAnimAsync()
         {
-            const int fadeInDuration = 500;
-            const int splashDisplayDuration = 2500;
-            const int fadeOutDuration = 500;
-            const int finalFadeDuration = 1000;
+            const int WindowFadeInMs = 500;
+            const int SplashHoldMs = 2000;
+            const int TransitionMs = 600;
 
             grid_Splash.Margin = new Thickness(0);
-            AnimLib.Fade(this, 0, 1, fadeInDuration);
-            await Task.Delay(fadeInDuration);
+            grid_Splash.Visibility = Visibility.Visible;
 
-            AnimLib.Fade(grid_Splash, 0, 1, fadeInDuration);
-            await Task.Delay(splashDisplayDuration);
+            AnimLib.Fade(this, 0, 1, WindowFadeInMs);
+            AnimLib.Fade(grid_Splash, 0, 1, WindowFadeInMs);
+            await Task.Delay(WindowFadeInMs + SplashHoldMs);
 
-            AnimLib.Fade(grid_Splash, 1, 0, fadeOutDuration);
-            await Task.Delay(fadeOutDuration);
-
+            grid_Splash.IsHitTestVisible = false; 
             grid_BorderGrid.Visibility = Visibility.Visible;
-            AnimLib.Fade(grid_BorderGrid, 0, 1, fadeInDuration);
-            await Task.Delay(finalFadeDuration);
+
+            AnimLib.Fade(grid_Splash, 1, 0, TransitionMs);
+            AnimLib.Fade(grid_BorderGrid, 0, 1, TransitionMs);
+
+            await Task.Delay(TransitionMs);
 
             grid_Splash.Visibility = Visibility.Collapsed;
             grid_Splash.Margin = new Thickness(999);

@@ -6,41 +6,32 @@ using System.Windows;
 
 namespace Chronos.Classes
 {
+    using System;
+    using System.IO;
+    using System.Windows;
+    using Microsoft.Win32;
+
     public static class ThemeManager
     {
         private static string _currentTheme = Settings.Default.Theme;
 
-        public static string CurrentTheme
-            => _currentTheme;
+        public static string CurrentTheme => _currentTheme;
 
         public static event Action? ThemeChanged;
 
         public static void SetTheme(string themeName)
         {
-            var dictionaries = Application.Current.Resources.MergedDictionaries;
+            if (string.IsNullOrWhiteSpace(themeName)) return;
 
-            for (int i = dictionaries.Count - 2; i >= 0; i--)
+            var uri = new Uri($"pack://application:,,,/Resources/Themes/{themeName}.xaml", UriKind.Absolute);
+
+            if (ApplyResourceDictionary(uri))
             {
-                var src = dictionaries[i].Source?.OriginalString;
-
-                if (src != null && src.Contains("/Themes/"))
-                    dictionaries.RemoveAt(i);
+                _currentTheme = themeName;
+                ThemeChanged?.Invoke();
             }
-
-            var dict = new ResourceDictionary
-            {
-                Source = new Uri($"Resources/Themes/{themeName}.xaml", UriKind.Relative)
-            };
-
-            dictionaries.Add(dict);
-
-            _currentTheme = themeName;
-            ThemeChanged?.Invoke();
         }
 
-        /// <summary>
-        /// Opens a file dialog pre-set to the Themes folder so the user can select a theme file.
-        /// </summary>
         public static void SelectThemeFromFile()
         {
             string themesFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Themes");
@@ -50,7 +41,7 @@ namespace Chronos.Classes
                 Directory.CreateDirectory(themesFolderPath);
             }
 
-            OpenFileDialog openFileDialog = new OpenFileDialog
+            var openFileDialog = new OpenFileDialog
             {
                 InitialDirectory = themesFolderPath,
                 Filter = "XAML Theme Files (*.xaml)|*.xaml|All Files (*.*)|*.*",
@@ -59,10 +50,44 @@ namespace Chronos.Classes
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string themeName = Path.GetFileNameWithoutExtension(openFileDialog.FileName);
+                var fileUri = new Uri(openFileDialog.FileName, UriKind.Absolute);
 
-                SetTheme(themeName);
+                if (ApplyResourceDictionary(fileUri))
+                {
+                    _currentTheme = Path.GetFileNameWithoutExtension(openFileDialog.FileName);
+                    ThemeChanged?.Invoke();
+                }
             }
+        }
+
+        private static bool ApplyResourceDictionary(Uri resourceUri)
+        {
+
+            ResourceDictionary newDict;
+            try
+            {
+                newDict = new ResourceDictionary { Source = resourceUri };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load theme from {resourceUri}: {ex.Message}");
+                return false;
+            }
+
+            var dictionaries = Application.Current.Resources.MergedDictionaries;
+
+            for (int i = dictionaries.Count - 1; i >= 0; i--)
+            {
+                var src = dictionaries[i].Source?.OriginalString;
+
+                if (src != null && src.Contains("/Themes/", StringComparison.OrdinalIgnoreCase))
+                {
+                    dictionaries.RemoveAt(i);
+                }
+            }
+
+            dictionaries.Add(newDict);
+            return true;
         }
     }
 }

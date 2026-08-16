@@ -13,59 +13,126 @@ class AnimLib
     public static readonly IEasingFunction Power = new PowerEase { EasingMode = EasingMode.EaseInOut };
     public static readonly IEasingFunction Quartic = new QuarticEase { EasingMode = EasingMode.EaseInOut };
     public static readonly IEasingFunction Quintic = new QuinticEase { EasingMode = EasingMode.EaseInOut };
+    private static readonly IEasingFunction DefaultEase = new QuadraticEase { EasingMode = EasingMode.EaseInOut };
 
-    public static void ObjectMove(DependencyObject Object, Thickness Get, Thickness Set, int MilliSeconds = 750)
+    public static Task FadeAsync(
+        UIElement target,
+        double from = 0,
+        double to = 1,
+        int milliseconds = 500,
+        IEasingFunction? easingFunction = null)
     {
-        Storyboard Board = new Storyboard();
-        ThicknessAnimation Animation = new ThicknessAnimation
+        if (target == null) return Task.CompletedTask;
+
+        var tcs = new TaskCompletionSource<bool>();
+
+        var animation = new DoubleAnimation
         {
-            EasingFunction = Quad,
-            From = Get,
-            To = Set,
-            AutoReverse = false,
-            Duration = new Duration(TimeSpan.FromMilliseconds(MilliSeconds))
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromMilliseconds(milliseconds),
+            EasingFunction = easingFunction ?? new QuadraticEase { EasingMode = EasingMode.EaseInOut }
         };
 
-        Storyboard.SetTarget(Animation, Object);
-        Storyboard.SetTargetProperty(Animation, new PropertyPath(FrameworkElement.MarginProperty));
+        var storyboard = new Storyboard();
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, new PropertyPath("Opacity"));
 
-        Board.Children.Add(Animation);
-        Board.Begin();
+        storyboard.Completed += (s, e) =>
+        {
+            target.Opacity = to;
+            tcs.TrySetResult(true);
+        };
+
+        storyboard.Children.Add(animation);
+        storyboard.Begin();
+
+        return tcs.Task;
     }
 
-    public static void Fade(DependencyObject Object, double From = 0, double To = 1, int MilliSeconds = 500)
+    public static Task MoveMarginAsync(
+        FrameworkElement target,
+        Thickness from,
+        Thickness to,
+        int milliseconds = 750,
+        IEasingFunction? easingFunction = null)
     {
-        Storyboard Board = new Storyboard();
-        DoubleAnimation Animation = new DoubleAnimation()
+        if (target == null) return Task.CompletedTask;
+
+        var tcs = new TaskCompletionSource<bool>();
+
+        var animation = new ThicknessAnimation
         {
-            From = From,
-            To = To,
-            AutoReverse = false,
-            Duration = new Duration(TimeSpan.FromMilliseconds(MilliSeconds))
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromMilliseconds(milliseconds),
+            EasingFunction = easingFunction ?? DefaultEase
         };
 
-        Storyboard.SetTarget(Animation, Object);
-        Storyboard.SetTargetProperty(Animation, new PropertyPath("Opacity", 1));
+        var storyboard = new Storyboard();
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, new PropertyPath(FrameworkElement.MarginProperty));
 
-        Board.Children.Add(Animation);
-        Board.Begin();
+        storyboard.Completed += (s, e) =>
+        {
+            target.Margin = to;
+            tcs.TrySetResult(true);
+        };
+
+        storyboard.Children.Add(animation);
+        storyboard.Begin();
+
+        return tcs.Task;
     }
 
-    public static void DoubleAnimation(DependencyObject Object, string Property, double From = 0, double To = 1, int MilliSeconds = 500)
+    public static void MoveMargin(
+            FrameworkElement target,
+            Thickness from,
+            Thickness to,
+            int milliseconds = 750,
+            IEasingFunction? easingFunction = null)
     {
-        Storyboard Board = new Storyboard();
-        DoubleAnimation Animation = new DoubleAnimation()
+        _ = MoveMarginAsync(target, from, to, milliseconds, easingFunction);
+    }
+
+    public static void Fade(
+            UIElement target,
+            double from = 0,
+            double to = 1,
+            int milliseconds = 500)
+    {
+        _ = FadeAsync(target, from, to, milliseconds);
+    }
+
+    public static void DoubleAnimation(
+            DependencyObject target,
+            string propertyPath,
+            double from = 0,
+            double to = 1,
+            int milliseconds = 500,
+            IEasingFunction? easingFunction = null,
+            Action? onCompleted = null)
+    {
+        if (target == null || string.IsNullOrEmpty(propertyPath)) return;
+
+        var animation = new DoubleAnimation
         {
-            From = From,
-            To = To,
-            AutoReverse = false,
-            Duration = new Duration(TimeSpan.FromMilliseconds(MilliSeconds))
+            From = from,
+            To = to,
+            Duration = new TimeSpan(0, 0, 0, 0, milliseconds),
+            EasingFunction = easingFunction
         };
 
-        Storyboard.SetTarget(Animation, Object);
-        Storyboard.SetTargetProperty(Animation, new PropertyPath(Property, 1));
+        var storyboard = new Storyboard();
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, new PropertyPath(propertyPath));
 
-        Board.Children.Add(Animation);
-        Board.Begin();
+        if (onCompleted != null)
+        {
+            storyboard.Completed += (s, e) => onCompleted();
+        }
+
+        storyboard.Children.Add(animation);
+        storyboard.Begin();
     }
 }
